@@ -27,8 +27,26 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     //await client.connect();
+
+    const database = client.db("bistroBossDB");
+    const menuCollection = database.collection("menu");
+    const reviewsCollection = database.collection("reviews");
+    
+    // menu related api
+    app.get("/menu", async(req, res) => {
+      const result = await menuCollection.find().toArray();
+      res.send(result)
+    })
+
+    // review related api
+    app.get("/reviews", async(req, res) => {
+      const result = await reviewsCollection.find().toArray();
+      res.send(result)
+    })
+
     // Send a ping to confirm a successful connection
     //await client.db("admin").command({ ping: 1 });
+    // Get the database and collection on which to run the operation
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
