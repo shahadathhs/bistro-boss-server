@@ -32,6 +32,21 @@ async function run() {
     const menuCollection = database.collection("menu");
     const reviewsCollection = database.collection("reviews");
     const cartsCollection = database.collection("carts");
+    const usersCollection = database.collection('users');
+
+    // users related api
+    app.post("/users", async(req, res) => {
+      const user = req.body;
+      // insert email if user does not exist
+      // in three way (1. email unique, 2. upsert, 3.simple checking)
+      const query = { email: user.email};
+      const existingUser = await usersCollection.findOne(query)
+      if (existingUser) {
+        return res.send({ message : "user already exist", insertedId: null})
+      }
+      const result = await usersCollection.insertOne(user)
+      res.send(result)
+    })
     
     // menu related api
     app.get("/menu", async(req, res) => {
