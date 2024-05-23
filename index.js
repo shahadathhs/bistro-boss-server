@@ -33,46 +33,59 @@ const client = new MongoClient(uri, {
   }
 });
 
-const verifyToken = async(req, res, next) => {
-  // local storage
-  const localToken = req.headers.authorization
-  //console.log("Inside verifyToken", localToken)
-  // token unavailable
-  const splitToken = localToken.split(' ')[1]
-  //console.log("Inside verifyToken", splitToken)
-  if (!splitToken) {
-    return res.status(401).send({message: "Unauthorized"})
-  } 
-  jwt.verify(splitToken, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
-    if(error){
-      return res.status(403).send({message: "Forbidden"})
-    }
-    req.decodedToken = decoded;
-    next();
-  })
+// const verifyToken = async(req, res, next) => {
+//   // local storage
+//   const localToken = req.headers.authorization
+//   //console.log("Inside verifyToken", localToken)
+//   // token unavailable
+//   const splitToken = localToken.split(' ')[1]
+//   //console.log("Inside verifyToken", splitToken)
+//   if (!splitToken) {
+//     return res.status(401).send({message: "Unauthorized"})
+//   } 
+//   jwt.verify(splitToken, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+//     if(error){
+//       return res.status(403).send({message: "Forbidden"})
+//     }
+//     req.decodedToken = decoded;
+//     next();
+//   })
   
-  // cookies
-  // const token = req.cookies?.token;
-  // console.log("middleware token", token)
-  // // token unavailable
-  // if (!token) {
-  //   return res.status(401).send({message: "Unauthorized"})
-  // }
-  // // token available
-  // jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
-  //   if(error){
-  //     return res.status(403).send({message: "Forbidden"})
-  //   }
-  //   req.decodedToken = decoded;
-  //   next();
-  // })
-}
+//   // cookies
+//   // const token = req.cookies?.token;
+//   // console.log("middleware token", token)
+//   // // token unavailable
+//   // if (!token) {
+//   //   return res.status(401).send({message: "Unauthorized"})
+//   // }
+//   // // token available
+//   // jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+//   //   if(error){
+//   //     return res.status(403).send({message: "Forbidden"})
+//   //   }
+//   //   req.decodedToken = decoded;
+//   //   next();
+//   // })
+// }
 
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production" ? true : false,
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-};
+
+// // use verify admin after verifyToken
+// const verifyAdmin = async(req, res, next) => {
+//   const email = req.decodedToken.email;
+//   const query = { email: email};
+//   const user = await usersCollection.findOne(query);
+//   const isAdmin = user?.role === "admin";
+//   if (!isAdmin) {
+//     return res.status(403).send({message: "Forbidden"})
+//   }
+//   next()
+// }
+
+// const cookieOptions = {
+//   httpOnly: true,
+//   secure: process.env.NODE_ENV === "production" ? true : false,
+//   sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+// };
 
 async function run() {
   try {
@@ -84,6 +97,60 @@ async function run() {
     const reviewsCollection = database.collection("reviews");
     const cartsCollection = database.collection("carts");
     const usersCollection = database.collection('users');
+
+    const verifyToken = async(req, res, next) => {
+      // local storage
+      const localToken = req.headers.authorization
+      //console.log("Inside verifyToken", localToken)
+      // token unavailable
+      const splitToken = localToken.split(' ')[1]
+      //console.log("Inside verifyToken", splitToken)
+      if (!splitToken) {
+        return res.status(401).send({message: "Unauthorized"})
+      } 
+      jwt.verify(splitToken, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        if(error){
+          return res.status(403).send({message: "Forbidden"})
+        }
+        req.decodedToken = decoded;
+        next();
+      })
+      
+      // cookies
+      // const token = req.cookies?.token;
+      // console.log("middleware token", token)
+      // // token unavailable
+      // if (!token) {
+      //   return res.status(401).send({message: "Unauthorized"})
+      // }
+      // // token available
+      // jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+      //   if(error){
+      //     return res.status(403).send({message: "Forbidden"})
+      //   }
+      //   req.decodedToken = decoded;
+      //   next();
+      // })
+    }
+    
+    
+    // use verify admin after verifyToken
+    const verifyAdmin = async(req, res, next) => {
+      const email = req.decodedToken.email;
+      const query = { email: email};
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({message: "Forbidden"})
+      }
+      next()
+    }
+    
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production" ? true : false,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+    };
 
     //jwt related api
     //creating Token
@@ -107,7 +174,7 @@ async function run() {
     });
 
     // users related api
-    app.get("/users", verifyToken, async(req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async(req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result)
     })
@@ -141,14 +208,14 @@ async function run() {
       res.send(result)
     })
 
-    app.delete("/users/:id", async(req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async(req, res) => {
       const id = req.params.id;
       const query = { _id : new ObjectId(id)};
       const result = await usersCollection.deleteOne(query);
       res.send(result)
     })
 
-    app.patch("/users/admin/:id", async(req, res) => {
+    app.patch("/users/admin/:id", verifyToken, verifyAdmin, async(req, res) => {
       const id = req.params.id;
       const query = { _id : new ObjectId(id)};
       const updateDoc = {
