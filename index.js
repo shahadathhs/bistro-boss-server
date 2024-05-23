@@ -35,6 +35,11 @@ async function run() {
     const usersCollection = database.collection('users');
 
     // users related api
+    app.get("/users", async(req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result)
+    })
+
     app.post("/users", async(req, res) => {
       const user = req.body;
       // insert email if user does not exist
@@ -46,6 +51,24 @@ async function run() {
       }
       const result = await usersCollection.insertOne(user)
       res.send(result)
+    })
+
+    app.delete("/users/:id", async(req, res) => {
+      const id = req.params.id;
+      const query = { _id : new ObjectId(id)};
+      const result = await usersCollection.deleteOne(query);
+      res.send(result)
+    })
+
+    app.patch("/users/admin/:id", async(req, res) => {
+      const id = req.params.id;
+      const query = { _id : new ObjectId(id)};
+      const updateDoc = {
+        $set: {
+          role: 'admin'
+        },
+      };
+      const result = await usersCollection.updateOne(query, updateDoc);
     })
     
     // menu related api
