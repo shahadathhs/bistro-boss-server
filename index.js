@@ -34,20 +34,38 @@ const client = new MongoClient(uri, {
 });
 
 const verifyToken = async(req, res, next) => {
-  const token = req.cookies?.token;
-  //console.log("middleware token", token)
+  // local storage
+  const localToken = req.headers.authorization
+  //console.log("Inside verifyToken", localToken)
   // token unavailable
-  if (!token) {
+  const splitToken = localToken.split(' ')[1]
+  //console.log("Inside verifyToken", splitToken)
+  if (!splitToken) {
     return res.status(401).send({message: "Unauthorized"})
-  }
-  // token available
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+  } 
+  jwt.verify(splitToken, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
     if(error){
       return res.status(403).send({message: "Forbidden"})
     }
     req.decodedToken = decoded;
     next();
   })
+  
+  // cookies
+  // const token = req.cookies?.token;
+  // console.log("middleware token", token)
+  // // token unavailable
+  // if (!token) {
+  //   return res.status(401).send({message: "Unauthorized"})
+  // }
+  // // token available
+  // jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+  //   if(error){
+  //     return res.status(403).send({message: "Forbidden"})
+  //   }
+  //   req.decodedToken = decoded;
+  //   next();
+  // })
 }
 
 const cookieOptions = {
@@ -71,7 +89,7 @@ async function run() {
     //creating Token
     app.post("/jwt", async (req, res) => {
       const userEmail = req.body;
-      console.log("user for token", userEmail);
+      //console.log("user for token", userEmail);
       const token = jwt.sign(userEmail, process.env.ACCESS_TOKEN_SECRET);
 
       res
@@ -82,16 +100,32 @@ async function run() {
     //clearing Token
     app.post("/logout", async (req, res) => {
       const userEmail = req.body;
-      console.log("logging out", userEmail);
+      //console.log("logging out", userEmail);
       res
         .clearCookie("token", { ...cookieOptions, maxAge: 0 })
         .send({ logoutSuccess: true });
     });
 
     // users related api
-    app.get("/users", async(req, res) => {
+    app.get("/users", verifyToken, async(req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result)
+    })
+
+    app.get("/users/admin/:email", verifyToken, async(req, res) => {
+      const email = req.params.email;
+      console.log(email, req.decodedToken)
+      if (email !== req.decodedToken?.email) {
+        return res.status(403).send({message: "Forbidden"})
+      }
+      const query = { email: email}
+      const user = await usersCollection.findOne(query)
+      let admin = false
+      if (user) {
+        admin = user?.role === "admin"
+        console.log("admin",admin)
+      }
+      res.send({admin})
     })
 
     app.post("/users", async(req, res) => {
@@ -141,7 +175,6 @@ async function run() {
     // cart related api
     app.get("/carts", async(req, res) => {
       const email = req.query.email;
-      console.log(email)
       const query = {ownerEmail : email}
       const result = await cartsCollection.find(query).toArray();
       res.send(result)
