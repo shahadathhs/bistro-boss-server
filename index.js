@@ -328,7 +328,6 @@ async function run() {
     //   });
     // })
     app.post("/create-payment-intent", async (req, res) => {
-      console.log(req.body);
       const { price } = req.body;
     
       // Check if the price is provided and is a number
@@ -350,6 +349,7 @@ async function run() {
         res.send({
           clientSecret: paymentIntent.client_secret,
         });
+        console.log('Payment SUCCESS', req.body)
       } catch (error) {
         console.error('Error creating payment intent:', error);
         res.status(500).send({ error: 'Internal Server Error' });
