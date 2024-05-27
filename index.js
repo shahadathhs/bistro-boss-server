@@ -103,6 +103,7 @@ async function run() {
     const reviewsCollection = database.collection("reviews");
     const cartsCollection = database.collection("carts");
     const usersCollection = database.collection('users');
+    const paymentsCollection = database.collection('payments');
 
     const verifyToken = async(req, res, next) => {
       // local storage
@@ -307,26 +308,8 @@ async function run() {
       res.send(result)
     })
 
+    //payment related api
     //payment intent
-    // app.post("/create-payment-intent", async (req, res) => {
-    //   console.log(req.body)
-    //   const {price} = req.body;
-    //   const amount = parseInt(price * 100);
-
-    //   // Create a PaymentIntent with the order amount and currency
-    //   const paymentIntent = await stripe.paymentIntents.create({
-    //     amount: amount,
-    //     currency: "usd",
-    //     payment_method_types: ["card", "link"],
-    //     automatic_payment_methods: {
-    //       enabled: true,
-    //     },
-    //   });
-
-    //   res.send({
-    //     clientSecret: paymentIntent.client_secret,
-    //   });
-    // })
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
     
@@ -355,6 +338,40 @@ async function run() {
         res.status(500).send({ error: 'Internal Server Error' });
       }
     });
+
+    app.post('/payments', async(req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentsCollection.insertOne(payment);
+      
+      //carefully delete carts item
+      console.log('paymentInfo', payment)
+      const query = { 
+        _id: { 
+          $in: payment.cartIds.map(id => new ObjectId(id)) 
+        } 
+      };
+      const deleteResult = await cartsCollection.deleteMany(query)
+      
+      res.send({paymentResult, deleteResult})
+    })
+
+    // app.get('/payments/:email', verifyToken, async(req, res) => {
+    //   const email = req.params.email;
+    //   console.log(email)
+    //   const query = {email : email};
+    //   if (email !== req.decodedToken.email) {
+    //     return res.status(403).send({message: 'forbidden access'})
+    //   }
+    //   const result = await paymentsCollection.find(query).toArray();
+    //   res.send(result)
+    // })
+
+    app.get("/payments", async(req, res) => {
+      const email = req.query.email;
+      const query = {email : email}
+      const result = await paymentsCollection.find(query).toArray();
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     //await client.db("admin").command({ ping: 1 });
