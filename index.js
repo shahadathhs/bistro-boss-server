@@ -166,18 +166,20 @@ async function run() {
       //console.log("user for token", userEmail);
       const token = jwt.sign(userEmail, process.env.ACCESS_TOKEN_SECRET);
 
-      res
-        .cookie("token", token, cookieOptions)
-        .send({ loginSuccess: true, token: token });
+      // res
+      //   .cookie("token", token, cookieOptions)
+      //   .send({ loginSuccess: true, token: token });
+      res.send({ loginSuccess: true, token: token });
     });
 
     //clearing Token
     app.post("/logout", async (req, res) => {
       const userEmail = req.body;
       //console.log("logging out", userEmail);
-      res
-        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-        .send({ logoutSuccess: true });
+      // res
+      //   .clearCookie("token", { ...cookieOptions, maxAge: 0 })
+      //   .send({ logoutSuccess: true });
+      res.send({ logoutSuccess: true });
     });
 
     // users related api
@@ -406,6 +408,44 @@ async function run() {
       ]).toArray();
       const revenue = result.length > 0 ? result[0].totalRevenue : 0;
       res.send({users, menuItems, orders, revenue})
+    })
+
+    // order status
+    app.get('/order-stats', verifyToken, verifyAdmin, async(req, res)=> {
+      const result = await paymentsCollection.aggregate([
+        { $unwind: "$menuIds" },
+        {
+          $addFields: {
+            menuObjectId: { $toObjectId: "$menuIds" }
+          }
+        },
+        {
+          $lookup: {
+            from: "menu",
+            localField: "menuObjectId",
+            foreignField: "_id",
+            as: "menuDetails"
+          }
+        },
+        { $unwind: "$menuDetails" },
+        {
+          $group: {
+            _id: "$menuDetails.category",
+            quantity: { $sum: 1 },
+            revenue: { $sum: "$menuDetails.price" }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            category: "$_id",
+            quantity: 1,
+            revenue: 1
+          }
+        }
+      ]).toArray();
+
+      res.send(result)
     })
 
     // Send a ping to confirm a successful connection
