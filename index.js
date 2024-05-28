@@ -373,6 +373,41 @@ async function run() {
       res.send(result)
     })
 
+    // stats related api
+    app.get("/admin-stats", verifyToken, verifyAdmin, async(req, res) => {
+      const users = await usersCollection.estimatedDocumentCount();
+      const menuItems = await menuCollection.estimatedDocumentCount();
+      const orders = await paymentsCollection.estimatedDocumentCount();
+      
+      // not the best way
+      //const payments = await paymentsCollection.find().toArray();
+      //const revenue = payments.reduce((sum, payment) => {  return sum + payment.price;}, 0);
+
+      //better way
+      // const revenuePipeline = [
+      //   {
+      //     $group: {
+      //       _id: null,
+      //       totalRevenue: { $sum: "$price" }
+      //     }
+      //   }
+      // ];
+      
+      // const result = await paymentsCollection.aggregate(revenuePipeline).toArray();
+      //const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+      const result = await paymentsCollection.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$price'}
+          }
+        }
+      ]).toArray();
+      const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+      res.send({users, menuItems, orders, revenue})
+    })
+
     // Send a ping to confirm a successful connection
     //await client.db("admin").command({ ping: 1 });
     // Get the database and collection on which to run the operation
